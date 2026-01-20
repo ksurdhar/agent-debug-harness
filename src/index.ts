@@ -9,14 +9,25 @@ await write(LOG_FILE, "");
 console.log(`Agent Debug Harness running on http://127.0.0.1:${PORT}`);
 console.log(`Logging to: ${LOG_FILE}`);
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
 
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
     // Health check
     if (req.method === "GET" && url.pathname === "/health") {
-      return new Response("OK");
+      return new Response("OK", { headers: corsHeaders });
     }
 
     // Get all logs
@@ -24,13 +35,13 @@ serve({
       const content = await file(LOG_FILE).text();
       const lines = content.trim().split("\n").filter(Boolean);
       const logs = lines.map((line) => JSON.parse(line));
-      return Response.json(logs);
+      return Response.json(logs, { headers: corsHeaders });
     }
 
     // Reset logs
     if (req.method === "POST" && url.pathname === "/reset") {
       await write(LOG_FILE, "");
-      return new Response("Logs cleared");
+      return new Response("Logs cleared", { headers: corsHeaders });
     }
 
     // Append log (with optional session ID in path)
@@ -48,12 +59,12 @@ serve({
         const existingContent = await file(LOG_FILE).text();
         await write(LOG_FILE, existingContent + logLine);
 
-        return new Response("OK");
+        return new Response("OK", { headers: corsHeaders });
       } catch (_e) {
-        return new Response("Invalid JSON", { status: 400 });
+        return new Response("Invalid JSON", { status: 400, headers: corsHeaders });
       }
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not Found", { status: 404, headers: corsHeaders });
   },
 });
